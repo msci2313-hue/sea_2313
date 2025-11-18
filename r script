@@ -1,11 +1,13 @@
 # ============================================================================
-# COVID-19 Data Visualization - 6 Plots 
+# COVID-19 Data Visualization - 6 Plots as per Attachments
 # ============================================================================
 
 library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(scales)
+library(qpdf)
+
 
 # Load cleaned CSV
 covid_data <- read.csv("C:/Users/user/Downloads/country_data.csv", stringsAsFactors = FALSE)
@@ -141,6 +143,7 @@ p6 <- ggplot(top10_metrics, aes(x = reorder(Country.Region, -Count), y = Count, 
         strip.text = element_text(size = 12, face = "bold"))
 print(p6)
 dev.off()
+pdf_files <- list.files(pattern = "plot[1-6]_.*\\.pdf$")
+pdf_combine(input = pdf_files, output = "All_COVID_Visualizations_Combined.pdf")
 
 cat("\nAll 6 plots created; check your working directory for corresponding PDF files.\n")
-
