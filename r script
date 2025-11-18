@@ -1,0 +1,159 @@
+# ============================================================================
+# COVID-19 Data Visualization - 6 Plots with Professional Legends
+# ============================================================================
+
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(scales)
+
+# Load cleaned CSV
+covid_data <- read.csv("C:/Users/user/Downloads/country_data.csv", stringsAsFactors = FALSE)
+
+covid_data <- covid_data %>%
+  mutate(
+    Mortality_Rate = ifelse(Confirmed > 0, (Deaths / Confirmed) * 100, 0),
+    Recovery_Rate = ifelse(Confirmed > 0, (Recovered / Confirmed) * 100, 0),
+    Active_Rate = ifelse(Confirmed > 0, (Active / Confirmed) * 100, 0)
+  )
+
+# ============================================================================
+# Plot 1 - Bar Chart: Top 20 Countries by Confirmed Cases
+# ============================================================================
+pdf("plot1_top20_countries.pdf", width = 12, height = 8)
+top20 <- covid_data %>% arrange(desc(Confirmed)) %>% head(min(20, nrow(covid_data)))
+p1 <- ggplot(top20, aes(x = reorder(Country.Region, Confirmed), y = Confirmed, fill = WHO_Region)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  coord_flip() +
+  scale_y_continuous(labels = comma, expand = c(0,0)) +
+  scale_fill_brewer(palette = "Set3", name = "WHO Region") +
+  labs(title = "Top 20 Countries by Confirmed COVID-19 Cases",
+       subtitle = "Countries ranked by total confirmed cases",
+       x = "Country/Region", y = "Total Confirmed Cases") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 16, hjust = 0.5),
+        legend.position = "bottom",
+        legend.title = element_text(size = 12, face = "bold"))
+print(p1)
+dev.off()
+
+# ============================================================================
+# Plot 2 - Scatter Plot: Death Rate vs Recovery Rate
+# ============================================================================
+pdf("plot2_death_vs_recovery.pdf", width = 12, height = 8)
+filtered <- covid_data %>% filter(Confirmed >= 1000)
+p2 <- ggplot(filtered, aes(x = Recovery_Rate, y = Mortality_Rate,
+                           size = Confirmed, color = WHO_Region)) +
+  geom_point(alpha = 0.7) +
+  scale_size_continuous(labels = comma, name = "Confirmed Cases") +
+  scale_color_brewer(palette = "Dark2", name = "WHO Region") +
+  labs(title = "COVID-19: Death Rate vs Recovery Rate",
+       subtitle = "Bubble size = total cases; colored by WHO Region",
+       x = "Recovery Rate (%)", y = "Mortality Rate (%)") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 16, hjust = 0.5),
+        legend.position = "right",
+        legend.box = "vertical",
+        legend.title = element_text(size = 12, face = "bold"))
+print(p2)
+dev.off()
+
+# ============================================================================
+# Plot 3 - Pie Chart: Regional Distribution (info in legend)
+# ============================================================================
+pdf("plot3_regional_distribution.pdf", width = 10, height = 8)
+regional_summary <- covid_data %>%
+  group_by(WHO_Region) %>%
+  summarise(Total_Confirmed = sum(Confirmed, na.rm = TRUE)) %>%
+  arrange(desc(Total_Confirmed)) %>%
+  filter(WHO_Region != "Other") %>%
+  mutate(Percentage = Total_Confirmed / sum(Total_Confirmed) * 100)
+regional_summary$label <- paste0(regional_summary$WHO_Region,
+                                 " - ", comma(regional_summary$Total_Confirmed),
+                                 " (", sprintf("%.1f%%", regional_summary$Percentage), ")")
+
+p3 <- ggplot(regional_summary, aes(x = "", y = Total_Confirmed, fill = label)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y") +
+  labs(title = "Distribution of COVID-19 Cases by WHO Region",
+       fill = "WHO Region | Cases | %") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 16, hjust = 0.5),
+        legend.position = "right",
+        legend.title = element_text(size = 12, face = "bold"),
+        legend.text = element_text(size = 10),
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        panel.grid = element_blank())
+print(p3)
+dev.off()
+
+# ============================================================================
+# Plot 4 - Stacked Bar: Case Status Breakdown (Deaths/Recovered/Active)
+# ============================================================================
+pdf("plot4_case_status_breakdown.pdf", width = 14, height = 8)
+top15 <- covid_data %>% arrange(desc(Confirmed)) %>% head(min(15, nrow(covid_data))) %>%
+  select(Country.Region, Deaths, Recovered, Active, Confirmed) %>%
+  pivot_longer(cols = c(Deaths, Recovered, Active), names_to = "Status", values_to = "Cases")
+top15$Status <- factor(top15$Status, levels = c("Active", "Recovered", "Deaths"))
+p4 <- ggplot(top15, aes(x = reorder(Country.Region, -Confirmed), y = Cases, fill = Status)) +
+  geom_bar(stat = "identity", position = "stack", width = 0.7) +
+  scale_y_continuous(labels = comma) +
+  scale_fill_manual(name = "Case Status (Stacked)", values = c("Active" = "#ff7f0e", "Recovered" = "#2ca02c", "Deaths" = "#d62728")) +
+  labs(title = "COVID-19 Case Status in Top 15 Countries",
+       subtitle = "Stacked bars show Deaths, Recovered, and Active cases",
+       x = "Country/Region", y = "Number of Cases") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 16, hjust = 0.5),
+        legend.position = "right",
+        legend.title = element_text(size = 12, face = "bold"))
+print(p4)
+dev.off()
+
+# ============================================================================
+# Plot 5 - Boxplot: Mortality Rate by WHO Region
+# ============================================================================
+pdf("plot5_mortality_boxplot.pdf", width = 12, height = 8)
+region_data <- covid_data %>% filter(WHO_Region != "Other")
+p5 <- ggplot(region_data, aes(x = WHO_Region, y = Mortality_Rate, fill = WHO_Region)) +
+  geom_boxplot(alpha = 0.8, outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
+  scale_fill_brewer(palette = "Pastel1", name = "WHO Region (Boxplot)") +
+  labs(title = "Distribution of Mortality Rate by WHO Region",
+       subtitle = "Boxplot: median, quartiles, outliers by region",
+       x = "WHO Region", y = "Mortality Rate (%)") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 16, hjust = 0.5),
+        legend.position = "right",
+        legend.title = element_text(size = 12, face = "bold")) +
+  coord_flip()
+print(p5)
+dev.off()
+
+# ============================================================================
+# Plot 6 - Faceted Bar: Top 10 Countries, Multiple Metrics
+# ============================================================================
+pdf("plot6_multiple_metrics.pdf", width = 14, height = 10)
+top10_metrics <- covid_data %>% arrange(desc(Confirmed)) %>% head(min(10, nrow(covid_data))) %>%
+  select(Country.Region, Confirmed, Deaths, Recovered, Active) %>%
+  pivot_longer(cols = c(Confirmed, Deaths, Recovered, Active), names_to = "Metric", values_to = "Count")
+top10_metrics$Metric <- factor(top10_metrics$Metric, levels = c("Confirmed", "Active", "Recovered", "Deaths"))
+p6 <- ggplot(top10_metrics, aes(x = reorder(Country.Region, -Count), y = Count, fill = Metric)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  facet_wrap(~Metric, scales = "free_y", ncol = 2) +
+  scale_y_continuous(labels = comma) +
+  scale_fill_manual(name = "Metric", values = c("Confirmed" = "#1f77b4", "Active" = "#ff7f0e",
+                                                "Recovered" = "#2ca02c", "Deaths" = "#d62728")) +
+  labs(title = "Top 10 Countries - COVID-19 Metrics",
+       subtitle = "Separate facets for Confirmed, Active, Recovered, and Deaths",
+       x = "Country/Region", y = "Count") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 16, hjust = 0.5),
+        legend.position = "bottom",
+        legend.title = element_text(size = 12, face = "bold"),
+        strip.text = element_text(size = 12, face = "bold"))
+print(p6)
+dev.off()
+
+# END NOTES
+cat("\nAll plots created with detailed legends explaining categories, regions, and metrics.\n")
+cat("Check your working directory for the 6 new PDFs.\n")
